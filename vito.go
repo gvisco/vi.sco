@@ -46,13 +46,13 @@ func main() {
 	config, err := initConfig()
 	if err != nil {
 		log.Panicf("Cannot read the configuration - %s", err)
-		return
+		os.Exit(1)
 	}
 
 	bot, err := initBot(config)
 	if err != nil {
 		log.Panicf("Cannot initialize the bot - %s", err)
-		return
+		os.Exit(1)
 	}
 
 	// bot.Debug = true
@@ -65,7 +65,7 @@ func main() {
 	updates, err := bot.GetUpdatesChan(u)
 	if err != nil {
 		log.Panicf("Cannot initialize the updates channel - %s", err)
-		return
+		os.Exit(1)
 	}
 
 	for update := range updates {
