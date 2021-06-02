@@ -3,3 +3,4 @@ token = "myToken"
 
 [permissions]
 owner = telegramId
+allowed = [telegramId_1, telegramId_2, ...]

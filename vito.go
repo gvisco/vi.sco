@@ -13,8 +13,23 @@ type Config struct {
 		Token string
 	}
 	Permissions struct {
-		Owner int
+		Owner   int
+		Allowed []int
 	}
+}
+
+type ChatChannel struct {
+	channel chan *tgbotapi.Update
+	chatId  int64
+	config  *Config
+}
+
+func NewChatChannel(chatId int64, config *Config) *ChatChannel {
+	cc := &ChatChannel{}
+	cc.channel = make(chan *tgbotapi.Update)
+	cc.chatId = chatId
+	cc.config = config
+	return cc
 }
 
 func initConfig() (*Config, error) {
@@ -40,6 +55,15 @@ func initBot(config *Config) (*tgbotapi.BotAPI, error) {
 	}
 
 	return bot, nil
+}
+
+func isAllowed(id int, config *Config) bool {
+	for _, a := range config.Permissions.Allowed {
+		if a == id {
+			return true
+		}
+	}
+	return false
 }
 
 func main() {
@@ -68,19 +92,31 @@ func main() {
 		os.Exit(1)
 	}
 
+	channels := make(map[int64]*ChatChannel)
 	for update := range updates {
 		if update.Message == nil { // ignore any non-Message Updates
 			continue
-		} else if update.Message.From.ID != config.Permissions.Owner {
-			log.Printf("Ignoring message from user %s. Text: %s", update.Message.From.UserName, update.Message.Text)
-			continue
+		} else if isAllowed(update.Message.From.ID, config) {
+			msg := update.Message
+			log.Printf("[Processing] User {%s} Text {%s} Chat {%d}", msg.From, msg.Text, msg.Chat.ID)
+			chatChannel := channels[msg.Chat.ID]
+			if chatChannel == nil {
+				log.Printf("[Init chat channel] Chat {%d}", msg.Chat.ID)
+				chatChannel = NewChatChannel(msg.Chat.ID, config)
+				channels[msg.Chat.ID] = chatChannel
+				go func(chatChannel *ChatChannel) {
+					for {
+						upd := <-chatChannel.channel
+						msg := tgbotapi.NewMessage(upd.Message.Chat.ID, upd.Message.Text)
+						bot.Send(msg)
+					}
+				}(chatChannel)
+			}
+			chatChannel.channel <- &update
+
+		} else {
+			log.Printf("[Ignoring] User {%s} UserId {%d} Text {%s} Chat {%d}", update.Message.From,
+				update.Message.From.ID, update.Message.Text, update.Message.Chat.ID)
 		}
-
-		log.Printf("[%s] %s", update.Message.From, update.Message.Text)
-
-		msg := tgbotapi.NewMessage(update.Message.Chat.ID, update.Message.Text)
-		// msg.ReplyToMessageID = update.Message.MessageID
-
-		bot.Send(msg)
 	}
 }
