@@ -1,0 +1,5 @@
+[bot]
+token = "myToken"
+
+[permissions]
+owner = telegramId
