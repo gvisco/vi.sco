@@ -51,7 +51,7 @@ func (engine *Gobotgram) newConversation(chatId int64) (*Conversation, error) {
 	workspace := "./workspace/" + fmt.Sprint(chatId)
 	err := os.MkdirAll(workspace, os.ModePerm)
 	if err != nil {
-		log.Panicf("[FATAL Cannot create workspace] ChatId {%d} Workspace {%s}", chatId, workspace)
+		log.Printf("[ERROR Cannot create workspace] ChatId {%d} Workspace {%s}", chatId, workspace)
 		return nil, fmt.Errorf("Cannot create workspace dir - %s", err)
 	}
 	cc.workspace = workspace
@@ -132,13 +132,13 @@ func initBot(config *Config) (*tgbotapi.BotAPI, error) {
 func NewGobotgram() (*Gobotgram, error) {
 	config, err := initConfig()
 	if err != nil {
-		log.Panicf("Cannot read the configuration - %s", err)
+		log.Printf("Cannot read the configuration - %s", err)
 		return nil, err
 	}
 
 	bot, err := initBot(config)
 	if err != nil {
-		log.Panicf("Cannot initialize the bot - %s", err)
+		log.Printf("Cannot initialize the bot - %s", err)
 		return nil, err
 	}
 
@@ -164,7 +164,7 @@ func (engine *Gobotgram) Start() {
 
 	updates, err := engine.tgbot.GetUpdatesChan(u)
 	if err != nil {
-		log.Panicf("Cannot initialize the updates channel - %s", err)
+		log.Printf("Cannot initialize the updates channel - %s", err)
 		os.Exit(1)
 	}
 
