@@ -4,12 +4,12 @@ import (
 	"log"
 	"os"
 
-	"github.com/gvisco/vi.sco/gobotgram"
-	"github.com/gvisco/vi.sco/gobotgram/sample/echo"
+	"github.com/gvisco/vi.sco/gotto"
+	"github.com/gvisco/vi.sco/gotto/sample/echo"
 )
 
 func main() {
-	bot, err := gobotgram.NewGobotgram()
+	bot, err := gotto.NewGotto()
 	if err != nil {
 		log.Panicf("Cannot initialize the bot - %s", err)
 		os.Exit(1)

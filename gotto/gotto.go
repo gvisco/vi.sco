@@ -1,4 +1,4 @@
-package gobotgram
+package gotto
 
 import (
 	"fmt"
@@ -9,18 +9,18 @@ import (
 	toml "github.com/pelletier/go-toml"
 )
 
-type Gobotgram struct {
+type Gotto struct {
 	tgbot         *tgbotapi.BotAPI
 	config        *Config
 	conversations map[int64]*Conversation
-	factories     []GobotgramBotFactory
+	factories     []GottoBotFactory
 }
 
-type GobotgramBotFactory interface {
-	CreateBot(workspace string) (GobotgramBot, error)
+type GottoBotFactory interface {
+	CreateBot(workspace string) (GottoBot, error)
 }
 
-type GobotgramBot interface {
+type GottoBot interface {
 	OnUpdate(userId string, userName string, message string) string
 }
 
@@ -38,15 +38,15 @@ type Conversation struct {
 	chatId    int64
 	config    *Config
 	workspace string
-	bots      []GobotgramBot
+	bots      []GottoBot
 }
 
-func (engine *Gobotgram) newConversation(chatId int64) (*Conversation, error) {
+func (engine *Gotto) newConversation(chatId int64) (*Conversation, error) {
 	cc := &Conversation{}
 	cc.channel = make(chan *tgbotapi.Update)
 	cc.chatId = chatId
 	cc.config = engine.config
-	cc.bots = []GobotgramBot{}
+	cc.bots = []GottoBot{}
 	// create the workspace
 	workspace := "./workspace/" + fmt.Sprint(chatId)
 	err := os.MkdirAll(workspace, os.ModePerm)
@@ -81,7 +81,7 @@ func (engine *Gobotgram) newConversation(chatId int64) (*Conversation, error) {
 	return cc, nil
 }
 
-func (engine *Gobotgram) getConversation(chatId int64) (*Conversation, error) {
+func (engine *Gotto) getConversation(chatId int64) (*Conversation, error) {
 	conversation := engine.conversations[chatId]
 	if conversation == nil {
 		log.Printf("[Init chat channel] Chat {%d}", chatId)
@@ -129,7 +129,7 @@ func initBot(config *Config) (*tgbotapi.BotAPI, error) {
 	return bot, nil
 }
 
-func NewGobotgram() (*Gobotgram, error) {
+func NewGotto() (*Gotto, error) {
 	config, err := initConfig()
 	if err != nil {
 		log.Printf("Cannot read the configuration - %s", err)
@@ -146,19 +146,19 @@ func NewGobotgram() (*Gobotgram, error) {
 
 	log.Printf("Initialized bot on account %s", bot.Self.UserName)
 
-	return &Gobotgram{
+	return &Gotto{
 		tgbot:         bot,
 		config:        config,
 		conversations: make(map[int64]*Conversation),
-		factories:     []GobotgramBotFactory{},
+		factories:     []GottoBotFactory{},
 	}, nil
 }
 
-func (engine *Gobotgram) RegisterBot(factory GobotgramBotFactory) {
+func (engine *Gotto) RegisterBot(factory GottoBotFactory) {
 	engine.factories = append(engine.factories, factory)
 }
 
-func (engine *Gobotgram) Start() {
+func (engine *Gotto) Start() {
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
 
