@@ -19,9 +19,9 @@ func NewFactory() *EchoBotFactory {
 
 func (*EchoBotFactory) CreateBot(workspace string) (gotto.GottoBot, error) {
 	log.Printf("[New EchoBot created] Workspace {%s}", workspace)
-	return EchoBot{workspace: workspace}, nil
+	return &EchoBot{workspace: workspace}, nil
 }
 
-func (EchoBot) OnUpdate(userId string, userName string, message string) string {
+func (bot *EchoBot) OnUpdate(userId string, userName string, message string) string {
 	return message
 }
