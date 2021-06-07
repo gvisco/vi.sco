@@ -15,6 +15,7 @@
 # vendor/
 
 .vscode/
+__debug_bin
 
 # Vi.Sco specific
 config.toml
