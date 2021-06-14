@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/gvisco/vi.sco/gotto"
@@ -24,11 +25,27 @@ const helpString string = `Available commands:
 /list help -- Print this help message
 `
 
+const editHelpString string = `Available commands for edit:
+/view -- Print the list content
+/append <item> -- Add a new item to the bottom of the list
+/rm <position> -- Remove an item
+/add <position> <item> -- Add an item in given position
+/mv <from> <to> -- Move an item from one position to another
+/edit <position> <item> -- Replace the item at a given position
+/end -- Stop editing the list
+/help -- Print this help message
+`
+
 var reListView *regexp.Regexp = regexp.MustCompile(`/list view ([^ ]+)$`)
 var reNewList *regexp.Regexp = regexp.MustCompile(`/list new ([^ ]+)$`)
 var reDelList *regexp.Regexp = regexp.MustCompile(`/list del ([^ ]+)$`)
 var reEditList *regexp.Regexp = regexp.MustCompile(`/list edit ([^ ]+)$`)
 var reUnrecognizedList *regexp.Regexp = regexp.MustCompile(`/list(.+)$`)
+var reEditAppend *regexp.Regexp = regexp.MustCompile(`/append (.+)$`)
+var reEditRemomve *regexp.Regexp = regexp.MustCompile(`/rm (\d+)$`)
+var reEditAdd *regexp.Regexp = regexp.MustCompile(`/add (\d+) (.+)$`)
+var reEditMove *regexp.Regexp = regexp.MustCompile(`/mv (\d+) (\d+)$`)
+var reEditEdit *regexp.Regexp = regexp.MustCompile(`/edit (\d+) (.+)$`)
 
 type state int
 
@@ -41,6 +58,7 @@ const (
 	newInput
 	newDone
 	deleteListConfirm
+	deleteListConfirmInput
 	deleteListDone
 	editList
 	editInput
@@ -52,6 +70,7 @@ const (
 	editEdit
 	editInvalid
 	editDone
+	editHelp
 )
 
 func (s state) String() string {
@@ -70,6 +89,8 @@ func (s state) String() string {
 		return "NewInput"
 	case newDone:
 		return "NewDone"
+	case deleteListConfirmInput:
+		return "DeleteListConfirmInput"
 	case deleteListConfirm:
 		return "DeleteListConfirm"
 	case deleteListDone:
@@ -94,6 +115,8 @@ func (s state) String() string {
 		return "EditInvalid"
 	case editDone:
 		return "EditDone"
+	case editHelp:
+		return "EditHelp"
 	default:
 		return fmt.Sprintf("%d", int(s))
 	}
@@ -264,10 +287,22 @@ func initStateMachine() *StateMachine {
 					lname := reDelList.FindStringSubmatch(s)[1]
 					l, ok := lb.lists[lname]
 					if !ok {
+						lb.state.current = waiting
 						return fmt.Sprintf("Invalid list name: %s", lname)
 					}
 					lb.currentList = l
 					return fmt.Sprintf("Are you sure you want to delete list '%s'?\nPlease reply 'yes' or 'no'", lb.currentList.name)
+				},
+				edges: []Edge{
+					{
+						matcher: func(s string) bool { return s == noEvent },
+						dest:    deleteListConfirmInput,
+					},
+				},
+			},
+			deleteListConfirmInput: {
+				activate: func(lb *ListBot, s string) string {
+					return "Please reply 'yes' or 'no'"
 				},
 				edges: []Edge{
 					{
@@ -279,9 +314,8 @@ func initStateMachine() *StateMachine {
 						dest:    deleteListDone,
 					},
 					{
-						// TODO: fix it! It does not work as the input is going to replace the current list
 						matcher: func(s string) bool { return true },
-						dest:    deleteListConfirm,
+						dest:    deleteListConfirmInput,
 					},
 				},
 			},
@@ -306,7 +340,16 @@ func initStateMachine() *StateMachine {
 				},
 			},
 			editList: {
-				activate: func(lb *ListBot, s string) string { return "TODO: edit list" },
+				activate: func(lb *ListBot, s string) string {
+					lname := reEditList.FindStringSubmatch(s)[1]
+					l, ok := lb.lists[lname]
+					if !ok {
+						lb.state.current = waiting
+						return fmt.Sprintf("Invalid list name: %s", lname)
+					}
+					lb.currentList = l
+					return fmt.Sprintf("Editing list '%s'.\nWrite `/help` to see the available commands", lb.currentList.name)
+				},
 				edges: []Edge{
 					{
 						matcher: func(s string) bool { return s == noEvent },
@@ -317,6 +360,10 @@ func initStateMachine() *StateMachine {
 			editInput: {
 				activate: func(lb *ListBot, s string) string { return "TODO: edit input" },
 				edges: []Edge{
+					{
+						matcher: func(s string) bool { return s == "/help" },
+						dest:    editHelp,
+					},
 					{
 						matcher: func(s string) bool { return s == "/end" },
 						dest:    editDone,
@@ -388,7 +435,26 @@ func initStateMachine() *StateMachine {
 				},
 			},
 			editMove: {
-				activate: func(lb *ListBot, s string) string { return "TODO: edit move" },
+				activate: func(lb *ListBot, s string) string {
+					items := lb.currentList.items
+					from, err1 := strconv.Atoi(reEditMove.FindStringSubmatch(s)[1])
+					if err1 != nil || from < 0 || from >= len(items) {
+						return fmt.Sprintf("Invalid 'from' index %s", reEditEdit.FindStringSubmatch(s)[1])
+					}
+					to, err2 := strconv.Atoi(reEditMove.FindStringSubmatch(s)[2])
+					if err2 != nil || to < 0 || to >= len(items) {
+						return fmt.Sprintf("Invalid 'to' index %s", reEditEdit.FindStringSubmatch(s)[2])
+					}
+					lb.currentList.items = move(items, from, to)
+					lname := lb.currentList.name
+					err := lb.currentList.saveToFile()
+					if err != nil {
+						lb.state.current = waiting
+						log.Printf("[ERROR ListBot Cannot save list to file] Workspace {%s} ListName {%s} Error {%s} ", lb.workspace, lname, err)
+						return fmt.Sprintf("Cannot save list '%s'. An error occurred", lname)
+					}
+					return ""
+				},
 				edges: []Edge{
 					{
 						matcher: func(s string) bool { return s == noEvent },
@@ -397,7 +463,23 @@ func initStateMachine() *StateMachine {
 				},
 			},
 			editEdit: {
-				activate: func(lb *ListBot, s string) string { return "TODO: edit edit" },
+				activate: func(lb *ListBot, s string) string {
+					idx, err := strconv.Atoi(reEditEdit.FindStringSubmatch(s)[1])
+					if err != nil || idx < 0 || idx >= len(lb.currentList.items) {
+						return fmt.Sprintf("Invalid index %s", reEditEdit.FindStringSubmatch(s)[1])
+					}
+					item := reEditEdit.FindStringSubmatch(s)[2]
+					lb.currentList.items[idx] = item
+
+					lname := lb.currentList.name
+					err = lb.currentList.saveToFile()
+					if err != nil {
+						lb.state.current = waiting
+						log.Printf("[ERROR ListBot Cannot save list to file] Workspace {%s} ListName {%s} Error {%s} ", lb.workspace, lname, err)
+						return fmt.Sprintf("Cannot save list '%s'. An error occurred", lname)
+					}
+					return ""
+				},
 				edges: []Edge{
 					{
 						matcher: func(s string) bool { return s == noEvent },
@@ -406,7 +488,7 @@ func initStateMachine() *StateMachine {
 				},
 			},
 			editInvalid: {
-				activate: func(lb *ListBot, s string) string { return "TODO: edit invalid" },
+				activate: func(lb *ListBot, s string) string { return "Invalid input. Type `/help` if needed" },
 				edges: []Edge{
 					{
 						matcher: func(s string) bool { return s == noEvent },
@@ -415,11 +497,22 @@ func initStateMachine() *StateMachine {
 				},
 			},
 			editDone: {
-				activate: func(lb *ListBot, s string) string { return "TODO: edit done" },
+				activate: func(lb *ListBot, s string) string {
+					return fmt.Sprintf("List '%s' edit complete", lb.currentList.name)
+				},
 				edges: []Edge{
 					{
 						matcher: func(s string) bool { return s == noEvent },
 						dest:    waiting,
+					},
+				},
+			},
+			editHelp: {
+				activate: func(lb *ListBot, s string) string { return editHelpString },
+				edges: []Edge{
+					{
+						matcher: func(s string) bool { return s == noEvent },
+						dest:    editInput,
 					},
 				},
 			},
@@ -540,4 +633,17 @@ func (list *List) saveToFile() error {
 		fmt.Fprintln(w, line)
 	}
 	return w.Flush()
+}
+
+func insert(slice []string, value string, index int) []string {
+	return append(slice[:index], append([]string{value}, slice[index:]...)...)
+}
+
+func remove(slice []string, index int) []string {
+	return append(slice[:index], slice[index+1:]...)
+}
+
+func move(slice []string, srcIndex int, dstIndex int) []string {
+	value := slice[srcIndex]
+	return insert(remove(slice, srcIndex), value, dstIndex)
 }
