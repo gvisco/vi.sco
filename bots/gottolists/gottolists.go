@@ -26,7 +26,6 @@ const helpString string = `Available commands:
 `
 
 const editHelpString string = `Available commands for edit:
-/view -- Print the list content
 /append <item> -- Add a new item to the bottom of the list
 /rm <position> -- Remove an item
 /add <position> <item> -- Add an item in given position
@@ -62,7 +61,6 @@ const (
 	deleteListDone
 	editList
 	editInput
-	editView
 	editAppend
 	editRemove
 	editAdd
@@ -78,7 +76,7 @@ func (s state) String() string {
 	case waiting:
 		return "Waiting"
 	case help:
-		return "Hep"
+		return "Help"
 	case listAll:
 		return "ListAll"
 	case viewList:
@@ -99,8 +97,6 @@ func (s state) String() string {
 		return "EditList"
 	case editInput:
 		return "EditInput"
-	case editView:
-		return "EditView"
 	case editAppend:
 		return "EditAppend"
 	case editRemove:
@@ -266,7 +262,7 @@ func initStateMachine() *StateMachine {
 						dest:    newDone,
 					},
 					{
-						matcher: func(s string) bool { return true },
+						matcher: func(s string) bool { return s != noEvent },
 						dest:    newInput,
 					},
 				},
@@ -314,7 +310,7 @@ func initStateMachine() *StateMachine {
 						dest:    deleteListDone,
 					},
 					{
-						matcher: func(s string) bool { return true },
+						matcher: func(s string) bool { return s != noEvent },
 						dest:    deleteListConfirmInput,
 					},
 				},
@@ -358,7 +354,13 @@ func initStateMachine() *StateMachine {
 				},
 			},
 			editInput: {
-				activate: func(lb *ListBot, s string) string { return "TODO: edit input" },
+				activate: func(lb *ListBot, s string) string {
+					result := fmt.Sprintf("--- %s ---", lb.currentList.name)
+					for idx, val := range lb.currentList.items {
+						result = fmt.Sprintf("%s\n[%d] %s", result, idx, val)
+					}
+					return result
+				},
 				edges: []Edge{
 					{
 						matcher: func(s string) bool { return s == "/help" },
@@ -369,46 +371,37 @@ func initStateMachine() *StateMachine {
 						dest:    editDone,
 					},
 					{
-						matcher: func(s string) bool { return s == "/view" },
-						dest:    editView,
-					},
-					{
-						matcher: func(s string) bool { return match("/append (.+)", s) },
+						matcher: func(s string) bool { return reEditAppend.MatchString(s) },
 						dest:    editAppend,
 					},
 					{
-						matcher: func(s string) bool { return match(`/rm (\d+)`, s) },
+						matcher: func(s string) bool { return reEditRemomve.MatchString(s) },
 						dest:    editRemove,
 					},
 					{
-						matcher: func(s string) bool { return match(`/add (\d+) (.+)`, s) },
+						matcher: func(s string) bool { return reEditAdd.MatchString(s) },
 						dest:    editAdd,
 					},
 					{
-						matcher: func(s string) bool { return match(`/mv (\d+) (\d+)`, s) },
+						matcher: func(s string) bool { return reEditMove.MatchString(s) },
 						dest:    editMove,
 					},
 					{
-						matcher: func(s string) bool { return match(`/edit (\d+) (.+)`, s) },
+						matcher: func(s string) bool { return reEditEdit.MatchString(s) },
 						dest:    editEdit,
 					},
 					{
-						matcher: func(s string) bool { return true },
+						matcher: func(s string) bool { return s != noEvent },
 						dest:    editInvalid,
 					},
 				},
 			},
-			editView: {
-				activate: func(lb *ListBot, s string) string { return "TODO: edit view" },
-				edges: []Edge{
-					{
-						matcher: func(s string) bool { return s == noEvent },
-						dest:    editInput,
-					},
-				},
-			},
 			editAppend: {
-				activate: func(lb *ListBot, s string) string { return "TODO: edit append" },
+				activate: func(lb *ListBot, s string) string {
+					item := reEditAppend.FindStringSubmatch(s)[1]
+					lb.currentList.items = append(lb.currentList.items, item)
+					return ""
+				},
 				edges: []Edge{
 					{
 						matcher: func(s string) bool { return s == noEvent },
@@ -417,7 +410,22 @@ func initStateMachine() *StateMachine {
 				},
 			},
 			editRemove: {
-				activate: func(lb *ListBot, s string) string { return "TODO: edit remove" },
+				activate: func(lb *ListBot, s string) string {
+					items := lb.currentList.items
+					idx, err := strconv.Atoi(reEditRemomve.FindStringSubmatch(s)[1])
+					if err != nil || idx < 0 || idx >= len(items) {
+						return fmt.Sprintf("Invalid index %s", reEditEdit.FindStringSubmatch(s)[1])
+					}
+					lb.currentList.remove(idx)
+					lname := lb.currentList.name
+					err = lb.currentList.saveToFile()
+					if err != nil {
+						lb.state.current = waiting
+						log.Printf("[ERROR ListBot Cannot save list to file] Workspace {%s} ListName {%s} Error {%s} ", lb.workspace, lname, err)
+						return fmt.Sprintf("Cannot save list '%s'. An error occurred", lname)
+					}
+					return ""
+				},
 				edges: []Edge{
 					{
 						matcher: func(s string) bool { return s == noEvent },
@@ -426,7 +434,24 @@ func initStateMachine() *StateMachine {
 				},
 			},
 			editAdd: {
-				activate: func(lb *ListBot, s string) string { return "TODO: edit add" },
+				activate: func(lb *ListBot, s string) string {
+					items := lb.currentList.items
+					idx, err := strconv.Atoi(reEditAdd.FindStringSubmatch(s)[1])
+					if err != nil || idx < 0 || idx >= len(items) {
+						return fmt.Sprintf("Invalid index %s", reEditEdit.FindStringSubmatch(s)[1])
+					}
+					item := reEditAdd.FindStringSubmatch(s)[2]
+					lb.currentList.insert(item, idx)
+					lname := lb.currentList.name
+					err = lb.currentList.saveToFile()
+					if err != nil {
+						lb.state.current = waiting
+						log.Printf("[ERROR ListBot Cannot save list to file] Workspace {%s} ListName {%s} Error {%s} ", lb.workspace, lname, err)
+						return fmt.Sprintf("Cannot save list '%s'. An error occurred", lname)
+					}
+
+					return ""
+				},
 				edges: []Edge{
 					{
 						matcher: func(s string) bool { return s == noEvent },
@@ -439,13 +464,13 @@ func initStateMachine() *StateMachine {
 					items := lb.currentList.items
 					from, err1 := strconv.Atoi(reEditMove.FindStringSubmatch(s)[1])
 					if err1 != nil || from < 0 || from >= len(items) {
-						return fmt.Sprintf("Invalid 'from' index %s", reEditEdit.FindStringSubmatch(s)[1])
+						return fmt.Sprintf("Invalid 'from' index %s", reEditMove.FindStringSubmatch(s)[1])
 					}
 					to, err2 := strconv.Atoi(reEditMove.FindStringSubmatch(s)[2])
 					if err2 != nil || to < 0 || to >= len(items) {
-						return fmt.Sprintf("Invalid 'to' index %s", reEditEdit.FindStringSubmatch(s)[2])
+						return fmt.Sprintf("Invalid 'to' index %s", reEditMove.FindStringSubmatch(s)[2])
 					}
-					lb.currentList.items = move(items, from, to)
+					lb.currentList.move(from, to)
 					lname := lb.currentList.name
 					err := lb.currentList.saveToFile()
 					if err != nil {
@@ -498,7 +523,7 @@ func initStateMachine() *StateMachine {
 			},
 			editDone: {
 				activate: func(lb *ListBot, s string) string {
-					return fmt.Sprintf("List '%s' edit complete", lb.currentList.name)
+					return fmt.Sprintf("Edit of lis '%s' complete", lb.currentList.name)
 				},
 				edges: []Edge{
 					{
@@ -520,14 +545,59 @@ func initStateMachine() *StateMachine {
 	}
 }
 
-func match(re string, s string) bool {
-	b, err := regexp.MatchString(re, s)
-	if err != nil {
-		log.Printf("[ERROR ListBot cannot apply matching] Regexp {%s} Input {%s} Error {%s}", re, s, err)
-		return false
-	}
+type List struct {
+	name     string
+	filePath string
+	items    []string
+}
 
-	return b
+func (list *List) loadFromFile() error {
+	file, err := os.Open(list.filePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	var lines []string
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+	list.items = lines
+
+	return scanner.Err()
+}
+
+func (list *List) saveToFile() error {
+	file, err := os.Create(list.filePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	w := bufio.NewWriter(file)
+	for _, line := range list.items {
+		fmt.Fprintln(w, line)
+	}
+	return w.Flush()
+}
+
+func (list *List) addItem(s string) {
+	list.items = append(list.items, s)
+}
+
+func (list *List) insert(value string, index int) {
+	list.items = append(list.items[:index], append([]string{value}, list.items[index:]...)...)
+}
+
+func (list *List) remove(index int) {
+	list.items = append(list.items[:index], list.items[index+1:]...)
+}
+
+func (list *List) move(srcIndex int, dstIndex int) {
+	value := list.items[srcIndex]
+	list.remove(srcIndex)
+	list.insert(value, dstIndex)
 }
 
 type ListBotFactory struct {
@@ -538,12 +608,6 @@ type ListBot struct {
 	lists       map[string]*List
 	state       *StateMachine
 	currentList *List
-}
-
-type List struct {
-	name     string
-	filePath string
-	items    []string
 }
 
 func NewFactory() *ListBotFactory {
@@ -579,7 +643,33 @@ func (*ListBotFactory) CreateBot(workspace string) (gotto.GottoBot, error) {
 	return &ListBot{workspace: workspace, lists: lists, state: sm, currentList: nil}, nil
 }
 
+// func (bot *ListBot) OnUpdate(userId string, userName string, message string) string {
+// 	curr := bot.state.nodes[bot.state.current]
+// 	for _, e := range curr.edges {
+// 		if e.matcher(message) {
+// 			log.Printf("[ListBot changing state] From {%+v} To {%+v}", bot.state.current, e.dest)
+// 			bot.state.current = e.dest
+// 			node := bot.state.nodes[e.dest]
+// 			reply := node.activate(bot, message)
+// 			// try the <nil> move
+// 			for _, e2 := range node.edges {
+// 				if e2.matcher(noEvent) {
+// 					log.Printf("[ListBot changing state] From {%+v} To {%+v}", bot.state.current, e.dest)
+// 					bot.state.current = e2.dest
+// 				}
+// 			}
+// 			return reply
+// 		}
+// 	}
+// 	return ""
+// }
+
 func (bot *ListBot) OnUpdate(userId string, userName string, message string) string {
+	return changeState(bot, message)
+}
+
+func changeState(bot *ListBot, message string) string {
+	result := ""
 	curr := bot.state.nodes[bot.state.current]
 	for _, e := range curr.edges {
 		if e.matcher(message) {
@@ -587,63 +677,16 @@ func (bot *ListBot) OnUpdate(userId string, userName string, message string) str
 			bot.state.current = e.dest
 			node := bot.state.nodes[e.dest]
 			reply := node.activate(bot, message)
-			// try the <nil> move
-			for _, e2 := range node.edges {
-				if e2.matcher(noEvent) {
-					log.Printf("[ListBot changing state] From {%+v} To {%+v}", bot.state.current, e.dest)
-					bot.state.current = e2.dest
-				}
+			if reply != "" {
+				result = result + "\n" + reply
 			}
-			return reply
+			// try to follow recursively the <nil> path
+			reply = changeState(bot, noEvent)
+			if reply != "" {
+				result = result + "\n" + reply
+			}
+			break
 		}
 	}
-	return ""
-}
-
-func (list *List) addItem(s string) {
-	list.items = append(list.items, s)
-}
-
-func (list *List) loadFromFile() error {
-	file, err := os.Open(list.filePath)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	var lines []string
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		lines = append(lines, scanner.Text())
-	}
-	list.items = lines
-
-	return scanner.Err()
-}
-
-func (list *List) saveToFile() error {
-	file, err := os.Create(list.filePath)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	w := bufio.NewWriter(file)
-	for _, line := range list.items {
-		fmt.Fprintln(w, line)
-	}
-	return w.Flush()
-}
-
-func insert(slice []string, value string, index int) []string {
-	return append(slice[:index], append([]string{value}, slice[index:]...)...)
-}
-
-func remove(slice []string, index int) []string {
-	return append(slice[:index], slice[index+1:]...)
-}
-
-func move(slice []string, srcIndex int, dstIndex int) []string {
-	value := slice[srcIndex]
-	return insert(remove(slice, srcIndex), value, dstIndex)
+	return result
 }
