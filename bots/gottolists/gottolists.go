@@ -246,6 +246,10 @@ func initStateMachine() *StateMachine {
 			},
 			newInput: {
 				activate: func(lb *ListBot, s string) string {
+					if s == noEvent {
+						return ""
+					}
+
 					lb.currentList.addItem(s)
 					lname := lb.currentList.name
 					err := lb.currentList.saveToFile()
@@ -287,7 +291,7 @@ func initStateMachine() *StateMachine {
 						return fmt.Sprintf("Invalid list name: %s", lname)
 					}
 					lb.currentList = l
-					return fmt.Sprintf("Are you sure you want to delete list '%s'?\nPlease reply 'yes' or 'no'", lb.currentList.name)
+					return fmt.Sprintf("Are you sure you want to delete list '%s'?", lb.currentList.name)
 				},
 				edges: []Edge{
 					{
