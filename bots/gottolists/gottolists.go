@@ -643,27 +643,6 @@ func (*ListBotFactory) CreateBot(workspace string) (gotto.GottoBot, error) {
 	return &ListBot{workspace: workspace, lists: lists, state: sm, currentList: nil}, nil
 }
 
-// func (bot *ListBot) OnUpdate(userId string, userName string, message string) string {
-// 	curr := bot.state.nodes[bot.state.current]
-// 	for _, e := range curr.edges {
-// 		if e.matcher(message) {
-// 			log.Printf("[ListBot changing state] From {%+v} To {%+v}", bot.state.current, e.dest)
-// 			bot.state.current = e.dest
-// 			node := bot.state.nodes[e.dest]
-// 			reply := node.activate(bot, message)
-// 			// try the <nil> move
-// 			for _, e2 := range node.edges {
-// 				if e2.matcher(noEvent) {
-// 					log.Printf("[ListBot changing state] From {%+v} To {%+v}", bot.state.current, e.dest)
-// 					bot.state.current = e2.dest
-// 				}
-// 			}
-// 			return reply
-// 		}
-// 	}
-// 	return ""
-// }
-
 func (bot *ListBot) OnUpdate(userId string, userName string, message string) string {
 	return changeState(bot, message)
 }
