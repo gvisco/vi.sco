@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gvisco/vi.sco/gotto"
+	"github.com/gvisco/vi.sco/pkg/gotto"
 )
 
 const noEvent string = "<nil evt>"

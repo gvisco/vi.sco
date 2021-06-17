@@ -3,7 +3,7 @@ package echo
 import (
 	"log"
 
-	"github.com/gvisco/vi.sco/gotto"
+	"github.com/gvisco/vi.sco/pkg/gotto"
 )
 
 type EchoBotFactory struct {

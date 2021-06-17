@@ -4,9 +4,9 @@ import (
 	"log"
 	"os"
 
-	"github.com/gvisco/vi.sco/bots/gottolists"
-	"github.com/gvisco/vi.sco/gotto"
-	// "github.com/gvisco/vi.sco/gotto/sample/echo"
+	"github.com/gvisco/vi.sco/pkg/bots/gottolists"
+	"github.com/gvisco/vi.sco/pkg/gotto"
+	// "github.com/gvisco/vi.sco/pkg/gotto/sample/echo"
 )
 
 func main() {
