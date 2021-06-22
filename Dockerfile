@@ -1,9 +1,14 @@
 FROM golang:1.16
 
-WORKDIR /go/src/app
-COPY . .
+WORKDIR /go/src/vito
+COPY vito/vito.go ./vito/
+COPY pkg/ ./pkg/
+COPY go.mod go.sum ./
 
 RUN go get -d -v ./...
 RUN go install -v ./...
 
-CMD ["app"]
+RUN mkdir -p /go/src/vito/
+RUN touch /go/src/vito/config.toml
+
+CMD ["vito"]

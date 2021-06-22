@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"log"
 	"os"
 
@@ -10,7 +11,10 @@ import (
 )
 
 func main() {
-	bot, err := gotto.NewGotto()
+	config := flag.String("config", "./config.toml", "the .toml configuration file path")
+	flag.Parse()
+
+	bot, err := gotto.NewGotto(config)
 	if err != nil {
 		log.Panicf("Cannot initialize the bot - %s", err)
 		os.Exit(1)

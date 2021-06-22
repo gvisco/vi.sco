@@ -52,7 +52,7 @@ func (engine *Gotto) newConversation(chatId int64) (*Conversation, error) {
 	err := os.MkdirAll(workspace, os.ModePerm)
 	if err != nil {
 		log.Printf("[ERROR Cannot create workspace] ChatId {%d} Workspace {%s}", chatId, workspace)
-		return nil, fmt.Errorf("Cannot create workspace dir - %s", err)
+		return nil, fmt.Errorf("cannot create workspace dir - %s", err)
 	}
 	cc.workspace = workspace
 	// initialize individual bots
@@ -95,8 +95,8 @@ func (engine *Gotto) getConversation(chatId int64) (*Conversation, error) {
 	return conversation, nil
 }
 
-func initConfig() (*Config, error) {
-	file, err := os.Open("config.toml")
+func initConfig(path *string) (*Config, error) {
+	file, err := os.Open(*path)
 	if err != nil {
 		return nil, err
 	}
@@ -129,10 +129,10 @@ func initBot(config *Config) (*tgbotapi.BotAPI, error) {
 	return bot, nil
 }
 
-func NewGotto() (*Gotto, error) {
-	config, err := initConfig()
+func NewGotto(configPath *string) (*Gotto, error) {
+	config, err := initConfig(configPath)
 	if err != nil {
-		log.Printf("Cannot read the configuration - %s", err)
+		log.Printf("Cannot read the configuration at %s - %s", configPath, err)
 		return nil, err
 	}
 
