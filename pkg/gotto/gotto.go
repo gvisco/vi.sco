@@ -132,7 +132,7 @@ func initBot(config *Config) (*tgbotapi.BotAPI, error) {
 func NewGotto(configPath *string) (*Gotto, error) {
 	config, err := initConfig(configPath)
 	if err != nil {
-		log.Printf("Cannot read the configuration at %s - %s", configPath, err)
+		log.Printf("Cannot read the configuration at %v - %s", configPath, err)
 		return nil, err
 	}
 
